@@ -275,57 +275,6 @@ function AppShell() {
     { id: "profile", icon: "User" },
   ];
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case "home":
-        return (
-          <HomeView
-            onOpenContent={setContentItem}
-            currentUser={session.user}
-            forceAction={forceAction}
-            clearAction={() => setForceAction(null)}
-            onOpenCompany={openCompanyHub}
-            onOpenListing={(id) => {
-              setPendingListingId(id);
-              setActiveTab("marketplace");
-            }}
-            onGoToHub={(launchId?: string) => { setActiveTab("hub"); if (launchId) setPendingLaunchId(launchId); }}
-            onOpenEntity={openEntity}
-          />
-        );
-      case "messages":
-        return (
-          <MessagesView
-            currentUser={session.user}
-            forceAction={forceAction}
-            clearAction={() => setForceAction(null)}
-            onInChatChange={setInChat}
-            onOpenProfile={(userId) => openEntity({ type: "user", id: userId })}
-          />
-        );
-      case "hub":
-        return <CodersHubView currentUser={session.user} forceAction={forceAction} clearAction={() => setForceAction(null)} forceLaunchId={pendingLaunchId} onForceLaunchConsumed={() => setPendingLaunchId(null)} onOpenProfile={(userId) => openEntity({ type: "user", id: userId })} />;
-      case "marketplace":
-        return (
-          <MarketplaceView
-            currentUser={session.user}
-            initialListingId={pendingListingId}
-            onOpenProfile={(userId) => openEntity({ type: "user", id: userId })}
-          />
-        );
-      case "trending":
-        return <TrendingView onOpenContent={setContentItem} />;
-      case "profile":
-        return (
-          <ProfileView
-            currentUser={session.user}
-            onOpenCompany={openCompanyHub}
-            onOpenListing={(id) => { setPendingListingId(id); setActiveTab("marketplace"); }}
-          />
-        );
-    }
-  };
-
   return (
     <div className="min-h-screen app-ambient text-[#202020] font-sans">
       <div className="app-frame max-w-[520px] mx-auto min-h-screen bg-[#FAF9F6] flex flex-col relative overflow-hidden">
@@ -394,20 +343,56 @@ function AppShell() {
         </header>
 
 
-        <main className="flex-1 overflow-y-auto no-scrollbar bg-[#FAF9F6] relative">
-
-          <AnimatePresence initial={false}>
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15, ease: "easeInOut" }}
-              className="w-full px-2.5 pt-3 bg-[#FAF9F6] min-h-full absolute inset-x-0 top-0"
-            >
-              {renderTab()}
-            </motion.div>
-          </AnimatePresence>
+        <main className="flex-1 bg-[#FAF9F6] relative overflow-hidden">
+          {/* ── Always-mounted tabs — visibility:hidden preserves React state + scroll ── */}
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar px-2.5 pt-3 bg-[#FAF9F6]", activeTab !== "home" && "invisible pointer-events-none")}>
+            <HomeView
+              onOpenContent={setContentItem}
+              currentUser={session.user}
+              forceAction={forceAction}
+              clearAction={() => setForceAction(null)}
+              onOpenCompany={openCompanyHub}
+              onOpenListing={(id) => { setPendingListingId(id); setActiveTab("marketplace"); }}
+              onGoToHub={(launchId?: string) => { setActiveTab("hub"); if (launchId) setPendingLaunchId(launchId); }}
+              onOpenEntity={openEntity}
+            />
+          </div>
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar bg-[#FAF9F6]", activeTab !== "messages" && "invisible pointer-events-none")}>
+            <MessagesView
+              currentUser={session.user}
+              forceAction={forceAction}
+              clearAction={() => setForceAction(null)}
+              onInChatChange={setInChat}
+              onOpenProfile={(userId) => openEntity({ type: "user", id: userId })}
+            />
+          </div>
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar px-2.5 pt-3 bg-[#FAF9F6]", activeTab !== "hub" && "invisible pointer-events-none")}>
+            <CodersHubView
+              currentUser={session.user}
+              forceAction={forceAction}
+              clearAction={() => setForceAction(null)}
+              forceLaunchId={pendingLaunchId}
+              onForceLaunchConsumed={() => setPendingLaunchId(null)}
+              onOpenProfile={(userId) => openEntity({ type: "user", id: userId })}
+            />
+          </div>
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar px-2.5 pt-3 bg-[#FAF9F6]", activeTab !== "marketplace" && "invisible pointer-events-none")}>
+            <MarketplaceView
+              currentUser={session.user}
+              initialListingId={pendingListingId}
+              onOpenProfile={(userId) => openEntity({ type: "user", id: userId })}
+            />
+          </div>
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar px-2.5 pt-3 bg-[#FAF9F6]", activeTab !== "trending" && "invisible pointer-events-none")}>
+            <TrendingView onOpenContent={setContentItem} />
+          </div>
+          <div className={cn("absolute inset-0 overflow-y-auto no-scrollbar px-2.5 pt-3 bg-[#FAF9F6]", activeTab !== "profile" && "invisible pointer-events-none")}>
+            <ProfileView
+              currentUser={session.user}
+              onOpenCompany={openCompanyHub}
+              onOpenListing={(id) => { setPendingListingId(id); setActiveTab("marketplace"); }}
+            />
+          </div>
         </main>
 
         <AnimatePresence>

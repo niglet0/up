@@ -3,6 +3,7 @@ import { Card, Avatar, Icon, Skeleton, cn } from "../components/UI";
 import { motion, AnimatePresence } from "motion/react";
 import { supabase } from "../integrations/supabase/client";
 import { useDeepFocus } from "../lib/focusStore";
+import * as Cache from "../lib/cache";
 import { SystemContractCard, type ContractEvent } from "../components/SystemContractCard";
 import { StoryComposer } from "../components/StoryComposer";
 import { StoryViewer } from "../components/StoryViewer";
@@ -94,40 +95,62 @@ export function HomeView({
   }, [forceAction]);
 
   useEffect(() => {
-    const fetchPosts = async () => {
+    const fetchPosts = async (force = false) => {
+      const ck = `posts:${currentUser?.id ?? "guest"}`;
+      if (!force) {
+        const c = Cache.get<any[]>(ck, 30_000);
+        if (c) { setPosts(c); setLoading(false); return; }
+      }
       try {
         const { data } = await supabase
           .from("v_posts")
           .select("*")
           .order("created_at", { ascending: false })
           .limit(30);
-        if (data) setPosts(data);
+        if (data) { Cache.set(ck, data); setPosts(data); }
       } catch {
       } finally {
         setLoading(false);
       }
     };
-    const fetchStories = async () => {
+    const fetchStories = async (force = false) => {
+      const ck = "stories";
+      if (!force) {
+        const c = Cache.get<any[]>(ck, 60_000);
+        if (c) { setStories(c); return; }
+      }
       try {
         const { data } = await supabase
           .from("v_stories")
           .select("*")
           .gt("expires_at", new Date().toISOString())
           .order("created_at", { ascending: false });
-        if (data) setStories(data);
+        if (data) { Cache.set(ck, data); setStories(data); }
       } catch {}
     };
     const fetchLikes = async () => {
       if (!currentUser) return;
+      const ck = `likes:${currentUser.id}`;
+      const c = Cache.get<string[]>(ck, 60_000);
+      if (c) { setLikedPosts(new Set(c)); return; }
       try {
         const { data } = await supabase
           .from("post_likes")
           .select("post_id")
           .eq("user_id", currentUser.id);
-        if (data) setLikedPosts(new Set(data.map((l: any) => l.post_id)));
+        if (data) {
+          const ids = data.map((l: any) => l.post_id);
+          Cache.set(ck, ids);
+          setLikedPosts(new Set(ids));
+        }
       } catch {}
     };
-    const fetchContracts = async () => {
+    const fetchContracts = async (force = false) => {
+      const ck = "contracts";
+      if (!force) {
+        const c = Cache.get<ContractEvent[]>(ck, 60_000);
+        if (c) { setContracts(c); return; }
+      }
       try {
         const { data } = await supabase
           .from("v_dev_bounties")
@@ -137,10 +160,13 @@ export function HomeView({
           .eq("status", "approved")
           .order("closed_at", { ascending: false })
           .limit(20);
-        if (data) setContracts(data as ContractEvent[]);
+        if (data) { Cache.set(ck, data as ContractEvent[]); setContracts(data as ContractEvent[]); }
       } catch {}
     };
     const fetchHotBounties = async () => {
+      const ck = "hotBounties";
+      const c = Cache.get<any[]>(ck, 60_000);
+      if (c) { setHotBounties(c); return; }
       try {
         const { data } = await supabase
           .from("dev_bounties")
@@ -148,10 +174,13 @@ export function HomeView({
           .eq("status", "open")
           .order("amount", { ascending: false })
           .limit(6);
-        if (data) setHotBounties(data);
+        if (data) { Cache.set(ck, data); setHotBounties(data); }
       } catch {}
     };
     const fetchFeaturedListings = async () => {
+      const ck = "featuredListings";
+      const c = Cache.get<any[]>(ck, 120_000);
+      if (c) { setFeaturedListings(c); return; }
       try {
         const { data } = await supabase
           .from("marketplace_listings")
@@ -159,10 +188,13 @@ export function HomeView({
           .eq("status", "active")
           .order("views_count", { ascending: false })
           .limit(8);
-        if (data) setFeaturedListings(data);
+        if (data) { Cache.set(ck, data); setFeaturedListings(data); }
       } catch {}
     };
     const fetchCompanyAnnouncements = async () => {
+      const ck = "companyAnnouncements";
+      const c = Cache.get<any[]>(ck, 120_000);
+      if (c) { setCompanyAnnouncements(c); return; }
       try {
         const { data } = await supabase
           .from("posts")
@@ -177,31 +209,46 @@ export function HomeView({
             .select("id,name,slug,logo_url,is_verified,industry")
             .in("id", ids);
           const coMap = Object.fromEntries((cos || []).map((c: any) => [c.id, c]));
-          setCompanyAnnouncements(data.map((p: any) => ({ ...p, company: coMap[p.author_entity_id] })));
+          const result = data.map((p: any) => ({ ...p, company: coMap[p.author_entity_id] }));
+          Cache.set(ck, result);
+          setCompanyAnnouncements(result);
         }
       } catch {}
     };
     const fetchSuggested = async () => {
+      const ck = "suggestedEntities";
+      const c = Cache.get<any[]>(ck, 300_000);
+      if (c) { setSuggestedEntities(c); return; }
       try {
         const { data } = await supabase
           .from("company_profiles")
           .select("id,name,slug,logo_url,is_verified,industry,followers_count,tagline")
           .order("followers_count", { ascending: false })
           .limit(5);
-        if (data) setSuggestedEntities(data);
+        if (data) { Cache.set(ck, data); setSuggestedEntities(data); }
       } catch {}
     };
-    const fetchFeedLaunches = async () => {
+    const fetchFeedLaunches = async (force = false) => {
+      const ck = "feedLaunches";
+      if (!force) {
+        const c = Cache.get<any[]>(ck, 30_000);
+        if (c) { setFeedLaunches(c); return; }
+      }
       try {
         const { data } = await supabase
           .from("v_launches")
           .select("*")
           .order("upvotes_count", { ascending: false })
           .limit(4);
-        if (data) setFeedLaunches(data);
+        if (data) { Cache.set(ck, data); setFeedLaunches(data); }
       } catch {}
     };
-    const fetchFeedCollab = async () => {
+    const fetchFeedCollab = async (force = false) => {
+      const ck = "feedCollab";
+      if (!force) {
+        const c = Cache.get<any[]>(ck, 30_000);
+        if (c) { setFeedCollab(c); return; }
+      }
       try {
         const { data } = await supabase
           .from("v_collab_requests")
@@ -209,11 +256,16 @@ export function HomeView({
           .eq("status", "open")
           .order("upvotes_count", { ascending: false })
           .limit(3);
-        if (data) setFeedCollab(data);
+        if (data) { Cache.set(ck, data); setFeedCollab(data); }
       } catch {}
     };
 
-    const fetchTopLaunch = async () => {
+    const fetchTopLaunch = async (force = false) => {
+      const ck = "topLaunch";
+      if (!force) {
+        const cv = Cache.get<{ launch: any; isWinner: boolean }>(ck, 15_000);
+        if (cv) { setTopLaunch(cv.launch); setTopLaunchIsWinner(cv.isWinner); return; }
+      }
       try {
         const today = new Date().toISOString().split("T")[0];
         const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
@@ -226,7 +278,10 @@ export function HomeView({
           .order("upvotes_count", { ascending: false })
           .limit(1)
           .maybeSingle();
-        if (pinned) { setTopLaunch(pinned); setTopLaunchIsWinner(true); return; }
+        if (pinned) {
+          Cache.set(ck, { launch: pinned, isWinner: true });
+          setTopLaunch(pinned); setTopLaunchIsWinner(true); return;
+        }
 
         // 2. Yesterday's top-voted (computed winner)
         const { data: yTop } = await supabase
@@ -237,9 +292,8 @@ export function HomeView({
           .limit(1)
           .maybeSingle();
         if (yTop && yTop.upvotes_count > 0) {
-          setTopLaunch(yTop);
-          setTopLaunchIsWinner(true);
-          // Try to mark as pinned in DB (silent fail if RLS blocks)
+          Cache.set(ck, { launch: yTop, isWinner: true });
+          setTopLaunch(yTop); setTopLaunchIsWinner(true);
           supabase.from("product_launches").update({ is_pinned: true }).eq("id", yTop.id).then();
           return;
         }
@@ -252,6 +306,7 @@ export function HomeView({
           .order("upvotes_count", { ascending: false })
           .limit(1)
           .maybeSingle();
+        Cache.set(ck, { launch: leader || null, isWinner: false });
         setTopLaunch(leader || null);
         setTopLaunchIsWinner(false);
       } catch {}
@@ -271,12 +326,12 @@ export function HomeView({
 
     const channel = supabase
       .channel("feed_updates")
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, fetchPosts)
-      .on("postgres_changes", { event: "*", schema: "public", table: "post_likes" }, fetchPosts)
-      .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, fetchStories)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "dev_bounties" }, fetchContracts)
-      .on("postgres_changes", { event: "*", schema: "public", table: "launch_upvotes" }, fetchTopLaunch)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "product_launches" }, fetchTopLaunch)
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => { Cache.invalidate(`posts:${currentUser?.id ?? "guest"}`); fetchPosts(true); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "post_likes" }, () => { Cache.invalidate(`posts:`); fetchPosts(true); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, () => { Cache.invalidate("stories"); fetchStories(true); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "dev_bounties" }, () => { Cache.invalidate("contracts"); fetchContracts(true); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "launch_upvotes" }, () => { Cache.invalidate("topLaunch"); Cache.invalidate("feedLaunches"); fetchTopLaunch(true); fetchFeedLaunches(true); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "product_launches" }, () => { Cache.invalidate("topLaunch"); Cache.invalidate("feedLaunches"); fetchTopLaunch(true); fetchFeedLaunches(true); })
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

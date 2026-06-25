@@ -5,6 +5,7 @@ import { supabase } from "../../integrations/supabase/client";
 import { Avatar, Icon, cn } from "../../components/UI";
 import { ImageUploader } from "../../components/marketplace/ImageUploader";
 import { toast } from "sonner";
+import * as Cache from "../../lib/cache";
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -290,16 +291,21 @@ function LaunchCard({
   forceExpanded?: boolean;
 }) {
   const cardRef = React.useRef<HTMLDivElement>(null);
-  const [voted, setVoted] = useState(!!launch.user_voted);
-  const [count, setCount] = useState(launch.upvotes_count ?? 0);
-  const [bookmarked, setBookmarked] = useState(!!launch.user_bookmarked);
+  const voteKey = `vote:${launch.id}:${currentUserId ?? ""}`;
+  const bkKey   = `bk:${launch.id}:${currentUserId ?? ""}`;
+  const [voted,     setVoted]     = useState(() => Cache.ixGet(voteKey) ?? !!launch.user_voted);
+  const [count,     setCount]     = useState(launch.upvotes_count ?? 0);
+  const [bookmarked,setBookmarked]= useState(() => Cache.ixGet(bkKey)  ?? !!launch.user_bookmarked);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    if (forceExpanded) {
-      setExpanded(true);
-      setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
-    }
+    if (!forceExpanded) return;
+    setExpanded(true);
+    const scroll = () => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scroll();
+    const t1 = setTimeout(scroll, 250);
+    const t2 = setTimeout(scroll, 700);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [forceExpanded]);
   const [showComments, setShowComments] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
@@ -324,6 +330,8 @@ function LaunchCard({
     if (!currentUserId) { toast.error("Sign in to upvote"); return; }
     const next = !voted;
     setVoted(next);
+    Cache.ixSet(voteKey, next);
+    Cache.invalidate("launches:");
     const nextCount = count + (next ? 1 : -1);
     setCount(nextCount);
     if (next) {
@@ -339,6 +347,7 @@ function LaunchCard({
     if (!currentUserId) { toast.error("Sign in to save"); return; }
     const next = !bookmarked;
     setBookmarked(next);
+    Cache.ixSet(bkKey, next);
     if (next) {
       await supabase.from("launch_bookmarks").insert({ launch_id: launch.id, user_id: currentUserId });
       toast.success("Saved to library");
@@ -887,7 +896,12 @@ export function LaunchesPanel({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const fetchLaunches = async () => {
+  const fetchLaunches = async (force = false) => {
+    const cacheKey = `launches:${tab}:${categoryFilter}:${currentUserId ?? ""}`;
+    if (!force) {
+      const cached = Cache.get<any[]>(cacheKey, 30_000);
+      if (cached) { setLaunches(cached); setLoading(false); return; }
+    }
     setLoading(true);
     try {
       let q = supabase.from("v_launches").select("*").order("upvotes_count", { ascending: false });
@@ -897,6 +911,7 @@ export function LaunchesPanel({
       if (categoryFilter) q = q.eq("category", categoryFilter);
       const { data } = await q.limit(30);
 
+      let result: any[] = data ?? [];
       if (data && currentUserId) {
         const ids = data.map((l: any) => l.id);
         const [votesRes, bookRes] = await Promise.all([
@@ -905,10 +920,10 @@ export function LaunchesPanel({
         ]);
         const voted = new Set((votesRes.data ?? []).map((v: any) => v.launch_id));
         const saved = new Set((bookRes.data ?? []).map((v: any) => v.launch_id));
-        setLaunches(data.map((l: any) => ({ ...l, user_voted: voted.has(l.id), user_bookmarked: saved.has(l.id) })));
-      } else {
-        setLaunches(data ?? []);
+        result = data.map((l: any) => ({ ...l, user_voted: voted.has(l.id), user_bookmarked: saved.has(l.id) }));
       }
+      Cache.set(cacheKey, result);
+      setLaunches(result);
     } finally {
       setLoading(false);
     }
