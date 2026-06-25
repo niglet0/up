@@ -83,12 +83,8 @@ export function HomeView({
   const [followedCompanies, setFollowedCompanies] = useState<Set<string>>(new Set());
   const [feedLaunches, setFeedLaunches] = useState<any[]>([]);
   const [feedCollab, setFeedCollab] = useState<any[]>([]);
-
-
-  const quote = {
-    content: "Waste no more time arguing what a good man should be. Be one.",
-    author: "Marcus Aurelius",
-  };
+  const [topLaunch, setTopLaunch] = useState<any>(null);
+  const [topLaunchIsWinner, setTopLaunchIsWinner] = useState(false);
 
   useEffect(() => {
     if (forceAction === "new_post") {
@@ -217,6 +213,50 @@ export function HomeView({
       } catch {}
     };
 
+    const fetchTopLaunch = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+        // 1. Explicit pinned winner (any date)
+        const { data: pinned } = await supabase
+          .from("v_launches")
+          .select("*")
+          .eq("is_pinned", true)
+          .order("upvotes_count", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (pinned) { setTopLaunch(pinned); setTopLaunchIsWinner(true); return; }
+
+        // 2. Yesterday's top-voted (computed winner)
+        const { data: yTop } = await supabase
+          .from("v_launches")
+          .select("*")
+          .eq("launch_date", yesterday)
+          .order("upvotes_count", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (yTop && yTop.upvotes_count > 0) {
+          setTopLaunch(yTop);
+          setTopLaunchIsWinner(true);
+          // Try to mark as pinned in DB (silent fail if RLS blocks)
+          supabase.from("product_launches").update({ is_pinned: true }).eq("id", yTop.id).then();
+          return;
+        }
+
+        // 3. Today's live leader
+        const { data: leader } = await supabase
+          .from("v_launches")
+          .select("*")
+          .eq("launch_date", today)
+          .order("upvotes_count", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        setTopLaunch(leader || null);
+        setTopLaunchIsWinner(false);
+      } catch {}
+    };
+
     fetchPosts();
     fetchStories();
     fetchLikes();
@@ -227,6 +267,7 @@ export function HomeView({
     fetchSuggested();
     fetchFeedLaunches();
     fetchFeedCollab();
+    fetchTopLaunch();
 
     const channel = supabase
       .channel("feed_updates")
@@ -557,25 +598,80 @@ export function HomeView({
   return (
     <div className="flex-1 overflow-y-auto pb-32 bg-[#FAF9F6] -mx-2.5">
 
-      <div
-        className="px-5 py-4 border-b border-[#C5A059]/20 bg-cover bg-center relative"
-        style={{
-          backgroundImage:
-            'url("https://images.unsplash.com/photo-1548625361-ec857cc228ae?q=80&w=2670&auto=format&fit=crop")',
-        }}
-      >
-        <div className="absolute inset-0 bg-[#FAF9F6]/90 backdrop-blur-md"></div>
-        <div className="relative z-10">
-          <p className="text-[12px] font-bold text-[#C5A059] uppercase tracking-widest mb-1">
-            Daily Stoic
-          </p>
-          <p className="text-[15px] font-medium leading-relaxed italic text-[#202020]">
-            &ldquo;{quote.content}&rdquo;
-          </p>
-          <p className="text-[11px] font-bold text-[#7A7A7A] uppercase tracking-widest mt-2">
-            — {quote.author}
-          </p>
-        </div>
+      {/* ── Launch of the Day ─────────────────────────────────── */}
+      <div className="px-5 py-3.5 border-b border-[#C5A059]/20 bg-[#FAF9F6]">
+        {topLaunch ? (
+          <div className="flex items-center gap-3">
+            {/* Thumbnail */}
+            {topLaunch.cover_url ? (
+              <img
+                src={topLaunch.cover_url}
+                alt={topLaunch.headline || topLaunch.product_title}
+                className="w-[52px] h-[52px] rounded-xl object-cover border border-[#E5E3DB] shrink-0 bg-[#F3F1EC]"
+              />
+            ) : (
+              <div className="w-[52px] h-[52px] rounded-xl border border-[#E5E3DB] bg-[#F3F1EC] flex items-center justify-center shrink-0">
+                <Icon name="Rocket" size={22} color="#C5A059" />
+              </div>
+            )}
+
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest leading-none mb-1">
+                {topLaunchIsWinner ? "🏆 Launch of the Day" : "⚡ Leading Now"}
+              </p>
+              <p className="text-[14px] font-black tracking-tight text-[#202020] truncate leading-tight">
+                {topLaunch.headline || topLaunch.product_title}
+              </p>
+              <div className="flex items-center gap-3 mt-1">
+                <span className="text-[10px] text-[#7A7A7A] font-bold flex items-center gap-0.5">
+                  <Icon name="ChevronUp" size={11} color="#C5A059" />
+                  {topLaunch.upvotes_count ?? 0}
+                </span>
+                {topLaunch.website_url && (
+                  <a href={topLaunch.website_url} target="_blank" rel="noreferrer"
+                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    onClick={(e) => e.stopPropagation()}>
+                    <Icon name="Globe" size={12} />
+                  </a>
+                )}
+                {topLaunch.github_url && (
+                  <a href={topLaunch.github_url} target="_blank" rel="noreferrer"
+                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    onClick={(e) => e.stopPropagation()}>
+                    <Icon name="Github" size={12} />
+                  </a>
+                )}
+                {topLaunch.app_store_url && (
+                  <a href={topLaunch.app_store_url} target="_blank" rel="noreferrer"
+                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    onClick={(e) => e.stopPropagation()}>
+                    <Icon name="Smartphone" size={12} />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            {onGoToHub && (
+              <button
+                onClick={onGoToHub}
+                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#C5A059]/10 text-[#C5A059] border border-[#C5A059]/25 text-[10px] font-black uppercase tracking-widest hover:bg-[#C5A059]/20 active:scale-95 transition-all"
+              >
+                <Icon name="ArrowRight" size={11} />
+                View
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 opacity-60">
+            <div className="w-[52px] h-[52px] rounded-xl border border-dashed border-[#C5A059]/40 flex items-center justify-center shrink-0">
+              <Icon name="Rocket" size={20} color="#C5A059" />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest mb-0.5">Launch of the Day</p>
+              <p className="text-[13px] font-medium text-[#7A7A7A]">No launches today yet — be first</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="py-4 border-b border-[#C5A059]/10 bg-[#FAF9F6]">

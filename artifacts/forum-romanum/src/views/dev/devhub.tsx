@@ -37,8 +37,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Sheet({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  open, onClose, title, children, footer,
+}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; footer?: React.ReactNode }) {
   return (
     <AnimatePresence>
       {open && (
@@ -51,16 +51,21 @@ function Sheet({
           <motion.div
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={spring}
-            className="absolute left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl border-t border-[#E5E3DB] shadow-2xl max-h-[88vh] overflow-y-auto"
+            className="absolute left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl border-t border-[#E5E3DB] shadow-2xl max-h-[88vh] flex flex-col"
           >
-            <div className="sticky top-0 bg-white/95 backdrop-blur border-b border-[#E5E3DB] px-5 py-3.5 flex items-center justify-between">
+            <div className="shrink-0 bg-white/95 backdrop-blur border-b border-[#E5E3DB] px-5 py-3.5 flex items-center justify-between relative">
               <div className="w-10 h-1 rounded-full bg-[#E5E3DB] absolute left-1/2 -translate-x-1/2 -top-2" />
               <h3 className="text-[15px] font-black tracking-tight">{title}</h3>
               <button onClick={onClose} className="p-1.5 -mr-1.5 rounded-full hover:bg-[#F3F1EC] active:scale-95">
                 <Icon name="X" size={18} />
               </button>
             </div>
-            <div className="p-5 space-y-3">{children}</div>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-3">{children}</div>
+            {footer && (
+              <div className="shrink-0 border-t border-[#E5E3DB] bg-white px-5 py-4">
+                {footer}
+              </div>
+            )}
           </motion.div>
         </>
       )}
@@ -765,8 +770,19 @@ function BountyDetail({
     : bounty.status === "approved" ? "Released"
     : "Refunded";
 
+  const actionBar = (
+    <BountyActionBar
+      bounty={bounty}
+      busy={busy}
+      canClaim={canClaim}
+      canApprove={canApprove}
+      canCancel={canCancel}
+      run={run}
+    />
+  );
+
   return (
-    <Sheet open={!!bounty} onClose={onClose} title="Bounty">
+    <Sheet open={!!bounty} onClose={onClose} title="Bounty" footer={actionBar}>
       {/* ── Hero header ─────────────────────────────────────────── */}
       <div className="rounded-2xl overflow-hidden border border-[#E5E3DB] bg-gradient-to-br from-[#1A1A1A] to-[#0F0F0F] text-white p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -1048,36 +1064,45 @@ function BountyDetail({
         </div>
       )}
 
-      {/* ── Action bar ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2 pt-1">
-        {canClaim && (
-          <Button disabled={busy} className="w-full"
-            onClick={() => run(() => supabase.rpc("claim_bounty", { p_bounty: bounty.id }), "Bounty claimed — start building!")}>
-            <Icon name="Hand" size={13} /> Claim this bounty
-          </Button>
-        )}
-        {canApprove && (
-          <Button disabled={busy} className="w-full"
-            onClick={() => run(() => supabase.rpc("approve_bounty", { p_bounty: bounty.id }), `Approved — ${bounty.amount} credits released`)}>
-            <Icon name="Check" size={13} /> Approve & release {bounty.amount} credits
-          </Button>
-        )}
-        {canCancel && (
-          <Button variant="ghost" disabled={busy} className="w-full"
-            onClick={() => run(() => supabase.rpc("cancel_bounty", { p_bounty: bounty.id }), "Bounty cancelled — credits refunded")}>
-            <Icon name="X" size={13} /> Cancel & refund
-          </Button>
-        )}
-        {bounty.status === "approved" && (
-          <div className="text-center text-[11px] font-bold uppercase tracking-widest text-[#C5A059]">
-            <Icon name="CheckCircle2" size={14} className="inline mr-1.5" />
-            Paid · closed {bounty.closed_at && new Date(bounty.closed_at).toLocaleDateString()}
-          </div>
-        )}
-        {bounty.status === "cancelled" && (
-          <div className="text-center text-[11px] font-bold uppercase tracking-widest text-[#7A7A7A]">Cancelled — Credits Refunded</div>
-        )}
-      </div>
     </Sheet>
+  );
+}
+
+function BountyActionBar({ bounty, busy, canClaim, canApprove, canCancel, run }: {
+  bounty: Bounty; busy: boolean;
+  canClaim: boolean; canApprove: boolean; canCancel: boolean;
+  run: (fn: () => PromiseLike<any>, msg: string) => void;
+}) {
+  if (!canClaim && !canApprove && !canCancel && bounty.status !== "approved" && bounty.status !== "cancelled") return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {canClaim && (
+        <Button disabled={busy} className="w-full"
+          onClick={() => run(() => supabase.rpc("claim_bounty", { p_bounty: bounty.id }), "Bounty claimed — start building!")}>
+          <Icon name="Hand" size={13} /> Claim this bounty
+        </Button>
+      )}
+      {canApprove && (
+        <Button disabled={busy} className="w-full"
+          onClick={() => run(() => supabase.rpc("approve_bounty", { p_bounty: bounty.id }), `Approved — ${bounty.amount} credits released`)}>
+          <Icon name="Check" size={13} /> Approve & release {bounty.amount} credits
+        </Button>
+      )}
+      {canCancel && (
+        <Button variant="ghost" disabled={busy} className="w-full"
+          onClick={() => run(() => supabase.rpc("cancel_bounty", { p_bounty: bounty.id }), "Bounty cancelled — credits refunded")}>
+          <Icon name="X" size={13} /> Cancel & refund
+        </Button>
+      )}
+      {bounty.status === "approved" && (
+        <div className="text-center text-[11px] font-bold uppercase tracking-widest text-[#C5A059]">
+          <Icon name="CheckCircle2" size={14} className="inline mr-1.5" />
+          Paid · closed {bounty.closed_at && new Date(bounty.closed_at).toLocaleDateString()}
+        </div>
+      )}
+      {bounty.status === "cancelled" && (
+        <div className="text-center text-[11px] font-bold uppercase tracking-widest text-[#7A7A7A]">Cancelled — Credits Refunded</div>
+      )}
+    </div>
   );
 }
