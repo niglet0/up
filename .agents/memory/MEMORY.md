@@ -1,0 +1,2 @@
+- [Forum Romanum Stack](forum-romanum-stack.md) — React+Vite+Supabase+TanStack Router, port 19758, previewPath `/`, gold theme #C5A059
+- [Forum Romanum Network Expansion](forum-romanum-network.md) — Launches, Collab, Network, Stacks panels added; SQL in NEW_TABLES.sql at repo root
