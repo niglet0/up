@@ -46,12 +46,12 @@ function Sheet({
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 z-50 bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-[200] bg-black/50 backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={spring}
-            className="absolute left-0 right-0 bottom-0 z-50 bg-white rounded-t-3xl border-t border-[#E5E3DB] shadow-2xl max-h-[88vh] flex flex-col"
+            className="fixed left-0 right-0 bottom-0 z-[201] bg-white rounded-t-3xl border-t border-[#E5E3DB] shadow-2xl max-h-[88vh] flex flex-col"
           >
             <div className="shrink-0 bg-white/95 backdrop-blur border-b border-[#E5E3DB] px-5 py-3.5 flex items-center justify-between relative">
               <div className="w-10 h-1 rounded-full bg-[#E5E3DB] absolute left-1/2 -translate-x-1/2 -top-2" />
