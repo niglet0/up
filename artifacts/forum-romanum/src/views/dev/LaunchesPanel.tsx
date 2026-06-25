@@ -283,15 +283,24 @@ function CommentsSection({
 // ─── LaunchCard ───────────────────────────────────────────────────────────────
 
 function LaunchCard({
-  launch, currentUserId, rank, onOpenProfile,
+  launch, currentUserId, rank, onOpenProfile, forceExpanded,
 }: {
   launch: any; currentUserId?: string; rank?: number;
   onOpenProfile?: (userId: string) => void;
+  forceExpanded?: boolean;
 }) {
+  const cardRef = React.useRef<HTMLDivElement>(null);
   const [voted, setVoted] = useState(!!launch.user_voted);
   const [count, setCount] = useState(launch.upvotes_count ?? 0);
   const [bookmarked, setBookmarked] = useState(!!launch.user_bookmarked);
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (forceExpanded) {
+      setExpanded(true);
+      setTimeout(() => cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    }
+  }, [forceExpanded]);
   const [showComments, setShowComments] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [commentCount, setCommentCount] = useState(launch.comments_count ?? 0);
@@ -355,6 +364,7 @@ function LaunchCard({
       </AnimatePresence>
 
       <motion.div
+        ref={cardRef}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
@@ -859,18 +869,23 @@ export function LaunchesPanel({
   onOpenProfile,
   forceCompose,
   onComposeClose,
+  forceLaunchId,
+  onForceLaunchConsumed,
 }: {
   currentUserId?: string;
   onOpenListing?: (id: string) => void;
   onOpenProfile?: (userId: string) => void;
   forceCompose?: boolean;
   onComposeClose?: () => void;
+  forceLaunchId?: string | null;
+  onForceLaunchConsumed?: () => void;
 }) {
   const [launches, setLaunches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [composeOpen, setComposeOpen] = useState(false);
   const [tab, setTab] = useState<"today" | "week" | "all" | "winners">("today");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchLaunches = async () => {
     setLoading(true);
@@ -901,6 +916,12 @@ export function LaunchesPanel({
 
   useEffect(() => { fetchLaunches(); }, [tab, currentUserId, categoryFilter]);
   useEffect(() => { if (forceCompose) setComposeOpen(true); }, [forceCompose]);
+  useEffect(() => {
+    if (!forceLaunchId) return;
+    setTab("all");
+    setExpandedId(forceLaunchId);
+    onForceLaunchConsumed?.();
+  }, [forceLaunchId]);
 
   const todayStr = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   const winner = launches.find((l) => l.is_pinned);
@@ -992,6 +1013,7 @@ export function LaunchesPanel({
           launch={winner}
           currentUserId={currentUserId}
           onOpenProfile={onOpenProfile}
+          forceExpanded={expandedId === winner.id}
         />
       )}
 
@@ -1003,6 +1025,7 @@ export function LaunchesPanel({
           currentUserId={currentUserId}
           rank={tab !== "winners" ? i + 1 : undefined}
           onOpenProfile={onOpenProfile}
+          forceExpanded={expandedId === launch.id}
         />
       ))}
     </div>

@@ -27,7 +27,7 @@ const LANG_COLORS: Record<string, string> = {
 };
 const langColor = (l?: string) => LANG_COLORS[l || ""] || "#C5A059";
 
-export function CodersHubView({ currentUser, forceAction, clearAction, onOpenProfile }: { currentUser?: any; forceAction?: string | null; clearAction?: () => void; onOpenProfile?: (userId: string) => void }) {
+export function CodersHubView({ currentUser, forceAction, clearAction, forceLaunchId, onForceLaunchConsumed, onOpenProfile }: { currentUser?: any; forceAction?: string | null; clearAction?: () => void; forceLaunchId?: string | null; onForceLaunchConsumed?: () => void; onOpenProfile?: (userId: string) => void }) {
   const [activeTab, setActiveTab] = useState<TabId>("Launches");
   const [repos, setRepos] = useState<any[]>([]);
   const [bounties, setBounties] = useState<any[]>([]);
@@ -243,7 +243,7 @@ export function CodersHubView({ currentUser, forceAction, clearAction, onOpenPro
             className="space-y-3"
           >
             {activeTab === "Launches" ? (
-              <LaunchesPanel currentUserId={currentUser?.id} onOpenListing={() => {}} forceCompose={launchCompose} onComposeClose={() => setLaunchCompose(false)} onOpenProfile={onOpenProfile} />
+              <LaunchesPanel currentUserId={currentUser?.id} onOpenListing={() => {}} forceCompose={launchCompose} onComposeClose={() => setLaunchCompose(false)} onOpenProfile={onOpenProfile} forceLaunchId={forceLaunchId} onForceLaunchConsumed={onForceLaunchConsumed} />
             ) : activeTab === "Collab" ? (
               <CollabPanel currentUserId={currentUser?.id} forceCompose={collabCompose} onComposeClose={() => setCollabCompose(false)} />
             ) : activeTab === "Network" ? (

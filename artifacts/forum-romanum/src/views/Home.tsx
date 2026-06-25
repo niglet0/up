@@ -43,7 +43,7 @@ export function HomeView({
   clearAction?: () => void;
   onOpenCompany?: (companyId: string) => void;
   onOpenListing?: (listingId: string) => void;
-  onGoToHub?: () => void;
+  onGoToHub?: (launchId?: string) => void;
   onOpenEntity?: (ref: { type: "user" | "company" | "channel"; id: string }) => void;
 }) {
   const [posts, setPosts] = useState<any[]>([]);
@@ -275,6 +275,8 @@ export function HomeView({
       .on("postgres_changes", { event: "*", schema: "public", table: "post_likes" }, fetchPosts)
       .on("postgres_changes", { event: "*", schema: "public", table: "stories" }, fetchStories)
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "dev_bounties" }, fetchContracts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "launch_upvotes" }, fetchTopLaunch)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "product_launches" }, fetchTopLaunch)
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
@@ -601,7 +603,10 @@ export function HomeView({
       {/* ── Launch of the Day ─────────────────────────────────── */}
       <div className="px-5 py-3.5 border-b border-[#C5A059]/20 bg-[#FAF9F6]">
         {topLaunch ? (
-          <div className="flex items-center gap-3">
+          <div
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={() => onGoToHub?.(topLaunch.id)}
+          >
             {/* Thumbnail */}
             {topLaunch.cover_url ? (
               <img
@@ -616,9 +621,16 @@ export function HomeView({
             )}
 
             <div className="flex-1 min-w-0">
-              <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest leading-none mb-1">
-                {topLaunchIsWinner ? "🏆 Launch of the Day" : "⚡ Leading Now"}
-              </p>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Icon
+                  name={topLaunchIsWinner ? "Trophy" : "TrendingUp"}
+                  size={10}
+                  color="#C5A059"
+                />
+                <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest leading-none">
+                  {topLaunchIsWinner ? "Launch of the Day" : "Top Today"}
+                </p>
+              </div>
               <p className="text-[14px] font-black tracking-tight text-[#202020] truncate leading-tight">
                 {topLaunch.headline || topLaunch.product_title}
               </p>
@@ -629,21 +641,21 @@ export function HomeView({
                 </span>
                 {topLaunch.website_url && (
                   <a href={topLaunch.website_url} target="_blank" rel="noreferrer"
-                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    className="text-[#B0ADA5] hover:text-[#C5A059] transition-colors"
                     onClick={(e) => e.stopPropagation()}>
                     <Icon name="Globe" size={12} />
                   </a>
                 )}
                 {topLaunch.github_url && (
                   <a href={topLaunch.github_url} target="_blank" rel="noreferrer"
-                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    className="text-[#B0ADA5] hover:text-[#C5A059] transition-colors"
                     onClick={(e) => e.stopPropagation()}>
                     <Icon name="Github" size={12} />
                   </a>
                 )}
                 {topLaunch.app_store_url && (
                   <a href={topLaunch.app_store_url} target="_blank" rel="noreferrer"
-                    className="text-[#7A7A7A] hover:text-[#C5A059] transition-colors"
+                    className="text-[#B0ADA5] hover:text-[#C5A059] transition-colors"
                     onClick={(e) => e.stopPropagation()}>
                     <Icon name="Smartphone" size={12} />
                   </a>
@@ -651,24 +663,21 @@ export function HomeView({
               </div>
             </div>
 
-            {onGoToHub && (
-              <button
-                onClick={onGoToHub}
-                className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#C5A059]/10 text-[#C5A059] border border-[#C5A059]/25 text-[10px] font-black uppercase tracking-widest hover:bg-[#C5A059]/20 active:scale-95 transition-all"
-              >
-                <Icon name="ArrowRight" size={11} />
-                View
-              </button>
-            )}
+            <div className="shrink-0 w-7 h-7 rounded-full bg-[#C5A059]/10 border border-[#C5A059]/20 flex items-center justify-center">
+              <Icon name="ChevronRight" size={13} color="#C5A059" />
+            </div>
           </div>
         ) : (
-          <div className="flex items-center gap-3 opacity-60">
-            <div className="w-[52px] h-[52px] rounded-xl border border-dashed border-[#C5A059]/40 flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-3 opacity-50">
+            <div className="w-[52px] h-[52px] rounded-xl border border-dashed border-[#C5A059]/30 flex items-center justify-center shrink-0">
               <Icon name="Rocket" size={20} color="#C5A059" />
             </div>
             <div>
-              <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest mb-0.5">Launch of the Day</p>
-              <p className="text-[13px] font-medium text-[#7A7A7A]">No launches today yet — be first</p>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <Icon name="Trophy" size={10} color="#C5A059" />
+                <p className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest">Launch of the Day</p>
+              </div>
+              <p className="text-[13px] font-medium text-[#7A7A7A]">No launches today — be first</p>
             </div>
           </div>
         )}

@@ -181,6 +181,7 @@ function AppShell() {
   const [entityRef, setEntityRef] = useState<EntityRef | null>(null);
   const [companyHubId, setCompanyHubId] = useState<string | null>(null);
   const [pendingListingId, setPendingListingId] = useState<string | null>(null);
+  const [pendingLaunchId, setPendingLaunchId] = useState<string | null>(null);
   const [inChat, setInChat] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const { active: focusActive } = useDeepFocus();
@@ -288,7 +289,7 @@ function AppShell() {
               setPendingListingId(id);
               setActiveTab("marketplace");
             }}
-            onGoToHub={() => setActiveTab("hub")}
+            onGoToHub={(launchId?: string) => { setActiveTab("hub"); if (launchId) setPendingLaunchId(launchId); }}
             onOpenEntity={openEntity}
           />
         );
@@ -303,7 +304,7 @@ function AppShell() {
           />
         );
       case "hub":
-        return <CodersHubView currentUser={session.user} forceAction={forceAction} clearAction={() => setForceAction(null)} onOpenProfile={(userId) => openEntity({ type: "user", id: userId })} />;
+        return <CodersHubView currentUser={session.user} forceAction={forceAction} clearAction={() => setForceAction(null)} forceLaunchId={pendingLaunchId} onForceLaunchConsumed={() => setPendingLaunchId(null)} onOpenProfile={(userId) => openEntity({ type: "user", id: userId })} />;
       case "marketplace":
         return (
           <MarketplaceView
