@@ -61,3 +61,10 @@ attached_assets/
 artifacts/api-server/
 artifacts/mockup-sandbox/
 .agents/
+node_modules/
+.local/
+.cache/
+attached_assets/
+artifacts/api-server/
+artifacts/mockup-sandbox/
+.agents/
